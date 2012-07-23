@@ -1,0 +1,40 @@
+#!/usr/bin/env perl
+use utf8;
+use strict;
+use warnings;
+use lib lib => glob 'modules/*/lib';
+
+use Proclet;
+use Path::Class;
+
+my $env = file('.env');
+my $Procfile = file('Procfile');
+
+if (-e $env) {
+	do { my ($k, $v) = split(/\s*=\s*/, 2); $ENV{$k} = $v } for $env->slurp;
+}
+
+my $command = shift || '';
+my $sub = {
+	run => sub {
+		exec(@_);
+	},
+	start => sub {
+		my $proclet = Proclet->new;
+		for my $program ($Procfile->slurp) {
+			chomp $program;
+			my ($name, $program) = split(/\s*:\s*/, $program, 2);
+			$name or next;
+			$proclet->service( code => sub { exec($program) } );
+		}
+		$proclet->run;
+	}
+}->{$command} or do {
+	print STDERR "Unknown command: $command";
+};
+
+$sub->();
+
+__END__
+
+a tiny foreman clone
